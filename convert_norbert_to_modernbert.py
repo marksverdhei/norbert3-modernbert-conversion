@@ -327,6 +327,8 @@ def main():
                         help="Test the conversion by comparing model outputs")
     parser.add_argument("--test_text", type=str, default="Nå ønsker de seg en[MASK] bolig.",
                         help="Text to use for testing (should include a [MASK] token)")
+    parser.add_argument("--push-to-hub", action="store_true", help="Push the converted model to the Hugging Face Hub")
+
     args = parser.parse_args()
 
     output_dir = args.output_dir
@@ -406,6 +408,11 @@ def main():
     print("Saving tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(args.norbert_model_id)
     tokenizer.save_pretrained(output_dir)
+
+    if args.push_to_hub:
+        print("Pushing the model to the Hugging Face Hub...")
+        modern_model.push_to_hub(output_dir)
+        tokenizer.push_to_hub(output_dir)
     
     print(f"\nConversion complete! The converted model is saved in {output_dir}")
     print("You can now load this model with: from transformers import AutoModelForMaskedLM")
