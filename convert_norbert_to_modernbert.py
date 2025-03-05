@@ -321,14 +321,16 @@ def main():
                         help="HuggingFace model ID for NorBERT (default: ltg/norbert3-base)")
     parser.add_argument("--modernbert_model_id", type=str, default="answerdotai/ModernBERT-base", 
                         help="HuggingFace model ID for ModernBERT config (default: answerdotai/ModernBERT-base)")
-    parser.add_argument("--output_dir", type=str, default="output_model",
-                        help="Directory to save the converted model (default: output_model)")
+    parser.add_argument("--output_dir", type=str, default="",
+                        help="Directory to save the converted model (default: )")
     parser.add_argument("--test_conversion", action="store_true",
                         help="Test the conversion by comparing model outputs")
     parser.add_argument("--test_text", type=str, default="Nå ønsker de seg en[MASK] bolig.",
                         help="Text to use for testing (should include a [MASK] token)")
     args = parser.parse_args()
-    
+
+    output_dir = args.output_dir
+
     print(f"Converting {args.norbert_model_id} to ModernBERT format...")
     
     # Load NorBERT config
@@ -365,10 +367,13 @@ def main():
     # Convert the config with tokenizer information
     print("Converting configuration...")
     new_config = convert_config(norbert_config, modernbert_config, tokenizer)
+
+    if not output_dir:
+        output_dir = "modern-norbert3-" + args.norbert_model_id.split("-")[-1]
     
     # Save the config to a temporary file
-    os.makedirs(args.output_dir, exist_ok=True)
-    config_path = os.path.join(args.output_dir, "config.json")
+    os.makedirs(output_dir, exist_ok=True)
+    config_path = os.path.join(output_dir, "config.json")
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(new_config, f, indent=2)
     print(f"Converted config saved to {config_path}")
@@ -394,17 +399,17 @@ def main():
         test_conversion(args.norbert_model_id, modern_model, tokenizer, args.test_text)
     
     # Save the model
-    print(f"\nSaving converted model to {args.output_dir}...")
-    modern_model.save_pretrained(args.output_dir)
+    print(f"\nSaving converted model to {output_dir}...")
+    modern_model.save_pretrained(output_dir)
     
     # Also save the tokenizer
     print("Saving tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(args.norbert_model_id)
-    tokenizer.save_pretrained(args.output_dir)
+    tokenizer.save_pretrained(output_dir)
     
-    print(f"\nConversion complete! The converted model is saved in {args.output_dir}")
+    print(f"\nConversion complete! The converted model is saved in {output_dir}")
     print("You can now load this model with: from transformers import AutoModelForMaskedLM")
-    print(f"model = AutoModelForMaskedLM.from_pretrained('{args.output_dir}')")
+    print(f"model = AutoModelForMaskedLM.from_pretrained('{output_dir}')")
 
 
 if __name__ == "__main__":
