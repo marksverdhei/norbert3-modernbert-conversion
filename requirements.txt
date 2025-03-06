@@ -1,3 +1,4 @@
 torch
 transformers>=4.49
 smart_open
+tensorboard
