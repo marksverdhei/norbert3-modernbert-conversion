@@ -33,6 +33,8 @@ parser.add_argument('--save-every', type=int, default=2000,
                     help='Save checkpoint every N steps')
 parser.add_argument('--log-every', type=int, default=100,
                     help='Log metrics every N steps')
+parser.add_argument('--embedding-noise', type=float, default=0.0,
+                    help='Amount of noise to add to sampled embeddings (default: 0.0)')
 parser.add_argument('--use-embeddings', action='store_true', default=True,
                     help='Sample from embedding layer instead of random vectors')
 parser.add_argument('--output-dir', type=str, default='./modernbert_progressive',
@@ -136,27 +138,40 @@ def evaluate_masked_prediction(model, example_text="Nå ønsker de seg en[MASK] 
     
     return results
 
-def generate_random_batch(batch_size, seq_len, hidden_size, use_embeddings=False):
+def generate_random_batch(batch_size, seq_len, hidden_size, use_embeddings=False, embedding_noise=0.0):
     """Generate random input vectors with shape [batch_size, seq_len, hidden_size]"""
     if use_embeddings:
         # Sample from the embedding layer instead of generating random vectors
-        # Get vocabulary size
+        # Get vocabulary size and special token IDs
         vocab_size = modernbert.model.embeddings.tok_embeddings.num_embeddings
+        cls_token_id = tokenizer.cls_token_id
+        sep_token_id = tokenizer.sep_token_id
+        mask_token_id = tokenizer.mask_token_id
         
-        # Generate random token IDs
-        random_token_ids = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+        # Initialize token IDs - ensure we have CLS at start, SEP at end, and at least one MASK
+        token_ids = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+        
+        # Set CLS and SEP tokens
+        token_ids[:, 0] = cls_token_id
+        token_ids[:, -1] = sep_token_id
+        
+        # Place at least one MASK token at a random position (not first or last)
+        for i in range(batch_size):
+            mask_pos = random.randint(1, seq_len - 2)  # Random position between CLS and SEP
+            token_ids[i, mask_pos] = mask_token_id
         
         # Get embeddings for these tokens
         with torch.no_grad():
             # Use ModernBERT's embedding layer
-            random_vectors = modernbert.model.embeddings.tok_embeddings(random_token_ids)
+            random_vectors = modernbert.model.embeddings.tok_embeddings(token_ids)
             
             # Apply layer norm and dropout if they are part of the embedding process
             random_vectors = modernbert.model.embeddings.norm(random_vectors)
             
-            # Add a bit of noise for stability and to avoid perfect matching
-            noise = torch.randn_like(random_vectors) * 0.01
-            random_vectors = random_vectors + noise
+            # Add noise if specified
+            if embedding_noise > 0:
+                noise = torch.randn_like(random_vectors) * embedding_noise
+                random_vectors = random_vectors + noise
     else:
         # Generate with small values to ensure stability
         random_vectors = torch.randn(batch_size, seq_len, hidden_size, device=device) * 0.1
@@ -209,7 +224,7 @@ def get_modernbert_outputs_with_intermediates(input_vectors, attention_mask):
     
     return hidden_states, predictions
 
-def evaluate(num_batches=10, batch_size=8, seq_len=128, use_embeddings=False, active_layers=None):
+def evaluate(num_batches=10, batch_size=8, seq_len=128, use_embeddings=False, active_layers=None, embedding_noise=0.0):
     """Evaluate models and return metrics"""
     modernbert.eval()
     
@@ -226,7 +241,8 @@ def evaluate(num_batches=10, batch_size=8, seq_len=128, use_embeddings=False, ac
                 batch_size=batch_size,
                 seq_len=seq_len,
                 hidden_size=modernbert.config.hidden_size,
-                use_embeddings=use_embeddings
+                use_embeddings=use_embeddings,
+                embedding_noise=embedding_noise
             )
             
             # Get outputs from both models with intermediate activations
@@ -385,7 +401,8 @@ def train_progressive_distillation():
                 batch_size=args.batch_size,
                 seq_len=args.seq_len,
                 hidden_size=modernbert.config.hidden_size,
-                use_embeddings=args.use_embeddings
+                use_embeddings=args.use_embeddings,
+                embedding_noise=args.embedding_noise
             )
             
             # Forward pass through both models and get intermediate activations
@@ -453,7 +470,8 @@ def train_progressive_distillation():
                     batch_size=args.batch_size,
                     seq_len=args.seq_len,
                     use_embeddings=args.use_embeddings,
-                    active_layers=active_layers
+                    active_layers=active_layers,
+                    embedding_noise=args.embedding_noise
                 )
                 
                 # Log evaluation metrics
@@ -518,7 +536,8 @@ def train_progressive_distillation():
             batch_size=args.batch_size,
             seq_len=args.seq_len,
             use_embeddings=args.use_embeddings,
-            active_layers=None  # Evaluate all layers
+            active_layers=None,  # Evaluate all layers
+            embedding_noise=args.embedding_noise
         )
         
         # Display comprehensive metrics
@@ -537,7 +556,8 @@ def train_progressive_distillation():
         num_batches=50,
         batch_size=args.batch_size,
         seq_len=args.seq_len,
-        use_embeddings=args.use_embeddings
+        use_embeddings=args.use_embeddings,
+        embedding_noise=args.embedding_noise
     )
     
     # Calculate elapsed time
@@ -598,4 +618,4 @@ if __name__ == "__main__":
     print("\nProgressive distillation completed successfully!")
 
 # Example command to run this script:
-# python progressive_distillation.py --size xs --batch-size 16 --seq-len 128 --steps-per-phase 5000 --use-embeddings
+# python progressive_distillation.py --size xs --batch-size 16 --seq-len 128 --steps-per-phase 5000 --use-embeddings --embedding-noise 0.0
