@@ -1,0 +1,50 @@
+ModernBertForMaskedLM(
+  (model): ModernBertModel(
+    (embeddings): ModernBertEmbeddings(
+      (tok_embeddings): Embedding(50000, 768, padding_idx=3)
+      (norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+      (drop): Dropout(p=0.0, inplace=False)
+    )
+    (layers): ModuleList(
+      (0): ModernBertEncoderLayer(
+        (attn_norm): Identity()
+        (attn): ModernBertAttention(
+          (Wqkv): Linear(in_features=768, out_features=2304, bias=False)
+          (rotary_emb): ModernBertRotaryEmbedding()
+          (Wo): Linear(in_features=768, out_features=768, bias=False)
+          (out_drop): Dropout(p=0.1, inplace=False)
+        )
+        (mlp_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+        (mlp): ModernBertMLP(
+          (Wi): Linear(in_features=768, out_features=4096, bias=False)
+          (act): GELUActivation()
+          (drop): Dropout(p=0.1, inplace=False)
+          (Wo): Linear(in_features=2048, out_features=768, bias=False)
+        )
+      )
+      (1-11): 11 x ModernBertEncoderLayer(
+        (attn_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+        (attn): ModernBertAttention(
+          (Wqkv): Linear(in_features=768, out_features=2304, bias=False)
+          (rotary_emb): ModernBertRotaryEmbedding()
+          (Wo): Linear(in_features=768, out_features=768, bias=False)
+          (out_drop): Dropout(p=0.1, inplace=False)
+        )
+        (mlp_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+        (mlp): ModernBertMLP(
+          (Wi): Linear(in_features=768, out_features=4096, bias=False)
+          (act): GELUActivation()
+          (drop): Dropout(p=0.1, inplace=False)
+          (Wo): Linear(in_features=2048, out_features=768, bias=False)
+        )
+      )
+    )
+    (final_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+  )
+  (head): ModernBertPredictionHead(
+    (dense): Linear(in_features=768, out_features=768, bias=False)
+    (act): GELUActivation()
+    (norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+  )
+  (decoder): Linear(in_features=768, out_features=50000, bias=True)
+)

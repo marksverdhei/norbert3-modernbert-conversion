@@ -1,0 +1,42 @@
+NorbertForMaskedLM(
+  (embedding): Embedding(
+    (word_embedding): Embedding(50000, 768)
+    (word_layer_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=False)
+    (dropout): Dropout(p=0.1, inplace=False)
+    (relative_layer_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+  )
+  (transformer): Encoder(
+    (layers): ModuleList(
+      (0-11): 12 x EncoderLayer(
+        (attention): Attention(
+          (in_proj_qk): Linear(in_features=768, out_features=1536, bias=True)
+          (in_proj_v): Linear(in_features=768, out_features=768, bias=True)
+          (out_proj): Linear(in_features=768, out_features=768, bias=True)
+          (pre_layer_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=False)
+          (post_layer_norm): LayerNorm((768,), eps=1e-07, elementwise_affine=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+        )
+        (mlp): FeedForward(
+          (mlp): Sequential(
+            (0): LayerNorm((768,), eps=1e-07, elementwise_affine=False)
+            (1): Linear(in_features=768, out_features=4096, bias=False)
+            (2): GeGLU()
+            (3): LayerNorm((2048,), eps=1e-07, elementwise_affine=False)
+            (4): Linear(in_features=2048, out_features=768, bias=False)
+            (5): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (classifier): MaskClassifier(
+    (nonlinearity): Sequential(
+      (0): LayerNorm((768,), eps=1e-07, elementwise_affine=False)
+      (1): Linear(in_features=768, out_features=768, bias=True)
+      (2): GELU(approximate='none')
+      (3): LayerNorm((768,), eps=1e-07, elementwise_affine=False)
+      (4): Dropout(p=0.1, inplace=False)
+      (5): Linear(in_features=768, out_features=50000, bias=True)
+    )
+  )
+)
