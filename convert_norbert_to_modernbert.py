@@ -2,11 +2,10 @@
 """
 A comprehensive conversion script for converting NorBERT (norbert3) to ModernBERT format.
 
-This script handles both configuration and weight conversion in one step.
+This script handles both configuration and weight conversion in one step, with model sizes hardcoded.
 
 Usage:
-    python norbert_to_modernbert_converter.py --norbert_model_id ltg/norbert3-base \
-                                              --modernbert_model_id answerdotai/ModernBERT-base \
+    python norbert_to_modernbert_converter.py --size base \
                                               --output_dir output_model \
                                               [--test_conversion]
 """
@@ -17,8 +16,28 @@ import copy
 import argparse
 import torch
 import smart_open
-import transformers
 from transformers import ModernBertConfig, ModernBertForMaskedLM, AutoModelForMaskedLM, AutoTokenizer
+
+
+# Hardcoded model mapping for NorBERT and ModernBERT
+MODEL_MAPPING = {
+    "xs": {
+        "norbert": "ltg/norbert3-xs",
+        "modernbert": "answerdotai/ModernBERT-base"
+    },
+    "small": {
+        "norbert": "ltg/norbert3-small",
+        "modernbert": "answerdotai/ModernBERT-base"
+    },
+    "base": {
+        "norbert": "ltg/norbert3-base",
+        "modernbert": "answerdotai/ModernBERT-base"
+    },
+    "large": {
+        "norbert": "ltg/norbert3-large",
+        "modernbert": "answerdotai/ModernBERT-large"
+    }
+}
 
 
 def convert_config(norbert_config, modernbert_config, norbert_tokenizer=None):
@@ -317,12 +336,10 @@ def test_conversion(norbert_model_id, modern_model, tokenizer, test_text="Nå ø
 
 def main():
     parser = argparse.ArgumentParser(description="Convert NorBERT model to ModernBERT format.")
-    parser.add_argument("--norbert_model_id", type=str, default="ltg/norbert3-base", 
-                        help="HuggingFace model ID for NorBERT (default: ltg/norbert3-base)")
-    parser.add_argument("--modernbert_model_id", type=str, default="answerdotai/ModernBERT-base", 
-                        help="HuggingFace model ID for ModernBERT config (default: answerdotai/ModernBERT-base)")
+    parser.add_argument("--size", type=str, choices=["xs", "small", "base", "large"], default="base", 
+                        help="Model size to convert (default: base)")
     parser.add_argument("--output_dir", type=str, default="",
-                        help="Directory to save the converted model (default: )")
+                        help="Directory to save the converted model (default: auto-generated based on size)")
     parser.add_argument("--test_conversion", action="store_true",
                         help="Test the conversion by comparing model outputs")
     parser.add_argument("--test_text", type=str, default="Nå ønsker de seg en[MASK] bolig.",
@@ -331,12 +348,23 @@ def main():
 
     args = parser.parse_args()
 
+    # Get the appropriate model IDs based on the selected size
+    if args.size not in MODEL_MAPPING:
+        print(f"Error: Invalid size '{args.size}'. Valid options are: {', '.join(MODEL_MAPPING.keys())}")
+        return
+    
+    norbert_model_id = MODEL_MAPPING[args.size]["norbert"]
+    modernbert_model_id = MODEL_MAPPING[args.size]["modernbert"]
+    
+    print(f"Converting {norbert_model_id} to ModernBERT format...")
+    
+    # Set output directory if not provided
     output_dir = args.output_dir
-
-    print(f"Converting {args.norbert_model_id} to ModernBERT format...")
+    if not output_dir:
+        output_dir = f"modern-norbert3-{args.size}"
     
     # Load NorBERT config
-    norbert_config_url = f"https://huggingface.co/{args.norbert_model_id}/raw/main/config.json"
+    norbert_config_url = f"https://huggingface.co/{norbert_model_id}/raw/main/config.json"
     print(f"Loading NorBERT config from {norbert_config_url}...")
     try:
         with smart_open.open(norbert_config_url, "r", encoding="utf-8") as f:
@@ -346,14 +374,14 @@ def main():
         print("Trying to load from the model directly...")
         # Alternative: load config from the model
         try:
-            norbert_model = AutoModelForMaskedLM.from_pretrained(args.norbert_model_id, trust_remote_code=True)
+            norbert_model = AutoModelForMaskedLM.from_pretrained(norbert_model_id, trust_remote_code=True)
             norbert_config = norbert_model.config.to_dict()
         except Exception as inner_e:
             print(f"Failed to load NorBERT config: {inner_e}")
             return
 
     # Load ModernBERT config
-    modernbert_config_url = f"https://huggingface.co/{args.modernbert_model_id}/raw/main/config.json"
+    modernbert_config_url = f"https://huggingface.co/{modernbert_model_id}/raw/main/config.json"
     print(f"Loading ModernBERT config from {modernbert_config_url}...")
     try:
         with smart_open.open(modernbert_config_url, "r", encoding="utf-8") as f:
@@ -364,14 +392,11 @@ def main():
 
     # Load the tokenizer to get special token IDs
     print("Loading tokenizer to get special token IDs...")
-    tokenizer = AutoTokenizer.from_pretrained(args.norbert_model_id)
+    tokenizer = AutoTokenizer.from_pretrained(norbert_model_id)
     
     # Convert the config with tokenizer information
     print("Converting configuration...")
     new_config = convert_config(norbert_config, modernbert_config, tokenizer)
-
-    if not output_dir:
-        output_dir = "modern-norbert3-" + args.norbert_model_id.split("-")[-1]
     
     # Save the config to a temporary file
     os.makedirs(output_dir, exist_ok=True)
@@ -381,8 +406,8 @@ def main():
     print(f"Converted config saved to {config_path}")
     
     # Load NorBERT model and convert weights
-    print(f"\nLoading NorBERT model from {args.norbert_model_id}...")
-    norbert_model = AutoModelForMaskedLM.from_pretrained(args.norbert_model_id, trust_remote_code=True)
+    print(f"\nLoading NorBERT model from {norbert_model_id}...")
+    norbert_model = AutoModelForMaskedLM.from_pretrained(norbert_model_id, trust_remote_code=True)
     norbert_state = norbert_model.state_dict()
     
     print("Converting model weights...")
@@ -398,7 +423,7 @@ def main():
     
     # Test the conversion if requested
     if args.test_conversion:
-        test_conversion(args.norbert_model_id, modern_model, tokenizer, args.test_text)
+        test_conversion(norbert_model_id, modern_model, tokenizer, args.test_text)
     
     # Save the model
     print(f"\nSaving converted model to {output_dir}...")
@@ -406,7 +431,6 @@ def main():
     
     # Also save the tokenizer
     print("Saving tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(args.norbert_model_id)
     tokenizer.save_pretrained(output_dir)
 
     if args.push_to_hub:
